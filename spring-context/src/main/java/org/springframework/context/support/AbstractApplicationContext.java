@@ -127,6 +127,8 @@ import org.springframework.util.ReflectionUtils;
 public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		implements ConfigurableApplicationContext {
 
+	private static Log suveng = LogFactory.getLog(AbstractApplicationContext.class);
+
 	/**
 	 * Name of the MessageSource bean in the factory.
 	 * If none is supplied, message resolution is delegated to the parent.
@@ -513,6 +515,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 
 	@Override
 	public void refresh() throws BeansException, IllegalStateException {
+		//todo://刷新配置源码阅读
+		suveng.info("ApplicationContext配置刷新");
 		synchronized (this.startupShutdownMonitor) {
 			// Prepare this context for refreshing.
 			prepareRefresh();

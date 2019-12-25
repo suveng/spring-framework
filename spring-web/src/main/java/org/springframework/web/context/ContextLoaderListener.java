@@ -16,6 +16,9 @@
 
 package org.springframework.web.context;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
 
@@ -35,6 +38,7 @@ import javax.servlet.ServletContextListener;
  * @see org.springframework.web.WebApplicationInitializer
  */
 public class ContextLoaderListener extends ContextLoader implements ServletContextListener {
+	private static Log suveng = LogFactory.getLog(ContextLoader.class);
 
 	/**
 	 * Create a new {@code ContextLoaderListener} that will create a web application
@@ -100,6 +104,7 @@ public class ContextLoaderListener extends ContextLoader implements ServletConte
 	 */
 	@Override
 	public void contextInitialized(ServletContextEvent event) {
+		suveng.info("Spring 实现 Servlet API 监听 Servlet容器初始化事件, 开始初始化 Root Web ApplicationContext...");
 		initWebApplicationContext(event.getServletContext());
 	}
 
@@ -109,6 +114,7 @@ public class ContextLoaderListener extends ContextLoader implements ServletConte
 	 */
 	@Override
 	public void contextDestroyed(ServletContextEvent event) {
+		suveng.info("Spring实现Servlet API 监听 Servlet容器销毁事件,开始关闭WebApplicationContext....");
 		closeWebApplicationContext(event.getServletContext());
 		ContextCleanupListener.cleanupAttributes(event.getServletContext());
 	}

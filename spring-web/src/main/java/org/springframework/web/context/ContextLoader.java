@@ -16,17 +16,8 @@
 
 package org.springframework.web.context;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.concurrent.ConcurrentHashMap;
-import javax.servlet.ServletContext;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextException;
@@ -41,6 +32,14 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+
+import javax.servlet.ServletContext;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Performs the actual initialization work for the root application context.
@@ -84,6 +83,7 @@ import org.springframework.util.StringUtils;
  * @see org.springframework.web.context.support.XmlWebApplicationContext
  */
 public class ContextLoader {
+	private static Log suveng = LogFactory.getLog(ContextLoader.class);
 
 	/**
 	 * Config param for the root WebApplicationContext id,
@@ -264,6 +264,7 @@ public class ContextLoader {
 					"check whether you have multiple ContextLoader* definitions in your web.xml!");
 		}
 
+		suveng.info("Spring Root WebApplicationContext 正在初始化");
 		servletContext.log("Initializing Spring root WebApplicationContext");
 		Log logger = LogFactory.getLog(ContextLoader.class);
 		if (logger.isInfoEnabled()) {
@@ -272,26 +273,38 @@ public class ContextLoader {
 		long startTime = System.currentTimeMillis();
 
 		try {
+			suveng.info("1. 检查context存储在本地实例变量，以确保它在ServletContext关闭时可用。");
+
 			// Store context in local instance variable, to guarantee that
 			// it is available on ServletContext shutdown.
 			if (this.context == null) {
+				suveng.info("context变量为空,证明WebApplication还没初始化,开始创建WebApplication");
 				this.context = createWebApplicationContext(servletContext);
 			}
+
+			suveng.info("2. 如果是ConfigurableWebApplicationContext实例,则进行WebApplicationContext的初始化");
 			if (this.context instanceof ConfigurableWebApplicationContext) {
 				ConfigurableWebApplicationContext cwac = (ConfigurableWebApplicationContext) this.context;
 				if (!cwac.isActive()) {
 					// The context has not yet been refreshed -> provide services such as
 					// setting the parent context, setting the application context id, etc
+					suveng.info("2.1 设置父容器");
 					if (cwac.getParent() == null) {
 						// The context instance was injected without an explicit parent ->
 						// determine parent for root web application context, if any.
 						ApplicationContext parent = loadParentContext(servletContext);
 						cwac.setParent(parent);
 					}
+
+					suveng.info("2.2 配置和刷新WebApplicationContext");
 					configureAndRefreshWebApplicationContext(cwac, servletContext);
 				}
 			}
+
+			suveng.info("3. Web Application初始化完成,servletContext设置RootWebApplicationContext的标记,用于开头的防重复限制");
 			servletContext.setAttribute(WebApplicationContext.ROOT_WEB_APPLICATION_CONTEXT_ATTRIBUTE, this.context);
+
+			suveng.info("4. 保存当前线程的context到currentContextPerThread的concurrentHashMap中,可以根据当前线程的ClassLoader获取到context");
 
 			ClassLoader ccl = Thread.currentThread().getContextClassLoader();
 			if (ccl == ContextLoader.class.getClassLoader()) {
@@ -305,7 +318,7 @@ public class ContextLoader {
 				long elapsedTime = System.currentTimeMillis() - startTime;
 				logger.info("Root WebApplicationContext initialized in " + elapsedTime + " ms");
 			}
-
+			suveng.info("Spring Root WebApplicationContext 初始化完成");
 			return this.context;
 		}
 		catch (RuntimeException | Error ex) {
@@ -328,6 +341,10 @@ public class ContextLoader {
 	 * @see ConfigurableWebApplicationContext
 	 */
 	protected WebApplicationContext createWebApplicationContext(ServletContext sc) {
+		suveng.info("为此加载程序实例化根WebApplicationContext，默认上下文类或自定义上下文类（如果指定）。\n" +
+				"此实现要求自定义上下文实现\n" +
+				"可配置WebApplicationContext接口。\n" +
+				"可以在子类中重写。此外，在刷新上下文之前调用自定义文本，允许子类对上下文执行自定义修改。");
 		Class<?> contextClass = determineContextClass(sc);
 		if (!ConfigurableWebApplicationContext.class.isAssignableFrom(contextClass)) {
 			throw new ApplicationContextException("Custom context class [" + contextClass.getName() +
@@ -368,9 +385,12 @@ public class ContextLoader {
 	}
 
 	protected void configureAndRefreshWebApplicationContext(ConfigurableWebApplicationContext wac, ServletContext sc) {
+		suveng.info("开始 配置和刷新WebApplicationContext");
+
+		suveng.info("1. WebApplicationContext 设置ApplicationContext的id");
 		if (ObjectUtils.identityToString(wac).equals(wac.getId())) {
-			// The application context id is still set to its original default value
-			// -> assign a more useful id based on available information
+			//应用程序上下文ID仍设置为其原始默认值
+			//->根据可用信息分配一个更有用的ID
 			String idParam = sc.getInitParameter(CONTEXT_ID_PARAM);
 			if (idParam != null) {
 				wac.setId(idParam);
@@ -382,22 +402,31 @@ public class ContextLoader {
 			}
 		}
 
+		suveng.info("2. WebApplicatinContext设置ServletContext");
 		wac.setServletContext(sc);
+
+		suveng.info("3. WebApplicationContext设置配置源的位置");
 		String configLocationParam = sc.getInitParameter(CONFIG_LOCATION_PARAM);
 		if (configLocationParam != null) {
 			wac.setConfigLocation(configLocationParam);
 		}
 
+		suveng.info("4. WebApplicationContext初始化配置源");
 		// The wac environment's #initPropertySources will be called in any case when the context
-		// is refreshed; do it eagerly here to ensure servlet property sources are in place for
-		// use in any post-processing or initialization that occurs below prior to #refresh
+		// is refreshed; do it eagerly here to ensure servlet property sources are in place for use in any post-processing or initialization that occurs below prior to #refresh
 		ConfigurableEnvironment env = wac.getEnvironment();
 		if (env instanceof ConfigurableWebEnvironment) {
 			((ConfigurableWebEnvironment) env).initPropertySources(sc, null);
 		}
 
+
+		suveng.info("5. WebApplicationContext 初始化");
 		customizeContext(sc, wac);
+
+		suveng.info("6. WebApplicationContext 执行刷新配置操作");
 		wac.refresh();
+
+		suveng.info("结束 配置和刷新WebApplicationContext");
 	}
 
 	/**
@@ -418,8 +447,8 @@ public class ContextLoader {
 	 * @see ApplicationContextInitializer#initialize(ConfigurableApplicationContext)
 	 */
 	protected void customizeContext(ServletContext sc, ConfigurableWebApplicationContext wac) {
-		List<Class<ApplicationContextInitializer<ConfigurableApplicationContext>>> initializerClasses =
-				determineContextInitializerClasses(sc);
+		suveng.info("初始化Spring Application Context,定义多个Spring Application Context");
+		List<Class<ApplicationContextInitializer<ConfigurableApplicationContext>>> initializerClasses = determineContextInitializerClasses(sc);
 
 		for (Class<ApplicationContextInitializer<ConfigurableApplicationContext>> initializerClass : initializerClasses) {
 			Class<?> initializerContextClass =
@@ -446,8 +475,7 @@ public class ContextLoader {
 	 * @param servletContext current servlet context
 	 * @see #CONTEXT_INITIALIZER_CLASSES_PARAM
 	 */
-	protected List<Class<ApplicationContextInitializer<ConfigurableApplicationContext>>>
-			determineContextInitializerClasses(ServletContext servletContext) {
+	protected List<Class<ApplicationContextInitializer<ConfigurableApplicationContext>>> determineContextInitializerClasses(ServletContext servletContext) {
 
 		List<Class<ApplicationContextInitializer<ConfigurableApplicationContext>>> classes =
 				new ArrayList<>();
